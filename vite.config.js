@@ -1,42 +1,42 @@
-import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
-import { fileURLToPath, URL } from 'node:url'
-import AutoImport from 'unplugin-auto-import/vite'
-import Components from 'unplugin-vue-components/vite'
-import { ArcoResolver } from 'unplugin-vue-components/resolvers'
+import { defineConfig } from "vite";
+import vue from "@vitejs/plugin-vue";
+import { fileURLToPath, URL } from "node:url";
+import AutoImport from "unplugin-auto-import/vite";
+import Components from "unplugin-vue-components/vite";
+import { ArcoResolver } from "unplugin-vue-components/resolvers";
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [
-    vue(),
-    AutoImport({
-      resolvers: [ArcoResolver()],
-      imports: ['vue', 'vue-router', 'pinia'],
-      eslintrc: {
-        enabled: true, // Generate .eslintrc-auto-import.json
-      },
-    }),
-    Components({
-      resolvers: [
-        ArcoResolver({
-          sideEffect: true
+    plugins: [
+        vue(),
+        AutoImport({
+            resolvers: [ArcoResolver()],
+            imports: ["vue", "vue-router", "pinia"],
+            eslintrc: {
+                enabled: true // Generate .eslintrc-auto-import.json
+            }
+        }),
+        Components({
+            resolvers: [
+                ArcoResolver({
+                    sideEffect: true
+                })
+            ]
         })
-      ]
-    })
-  ],
-  resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url))
-    }
-  },
-  css: {
-    preprocessorOptions: {
-      scss: {
-        api: 'modern-compiler'
-      }
-    }
-  },
-  base: '/LuckyDraw/',
+    ],
+    resolve: {
+        alias: {
+            "@": fileURLToPath(new URL("./src", import.meta.url))
+        }
+    },
+    css: {
+        preprocessorOptions: {
+            scss: {
+                api: "modern-compiler"
+            }
+        }
+    },
+    base: "/LuckyDraw/",
     build: {
         rollupOptions: {
             output: {
@@ -88,4 +88,4 @@ export default defineConfig({
             }
         }
     }
-})
+});

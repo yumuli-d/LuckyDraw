@@ -1,9 +1,10 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, h, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onUnmounted, h, defineAsyncComponent, watch } from 'vue'
 import { useMainStore } from '@/store/mainStore'
 import confetti from 'canvas-confetti'
 import { IconSettings, IconTrophy } from '@arco-design/web-vue/es/icon'
 import { Modal } from '@arco-design/web-vue'
+import TagCloud from './components/TagCloud.vue'
 
 const WinnersModal = defineAsyncComponent(() => import('./components/WinnersModal.vue'))
 
@@ -11,9 +12,10 @@ const store = useMainStore()
 
 // --- 状态 ---
 const isRolling = ref(false)
-const showWinnerModal = ref(false)
+// const showWinnerModal = ref(false)
 const currentWinners = ref([]) // 本轮中奖者
 const drawCount = ref(5) // 默认每次抽5人
+const showSphere = ref(true) // 是否显示球形动画
 
 // --- 奖项统计 ---
 const totalPrizes = computed(() => store.prizes.reduce((sum, p) => sum + p.count, 0))
@@ -57,8 +59,11 @@ const openWinnersModal = () => {
 }
 
 // --- 滚动动画 ---
-const displayUsers = ref([]) // 当前展示在屏幕上的用户
-let timer = null
+// const displayUsers = ref([]) // 当前展示在屏幕上的用户
+// let timer = null
+
+// 候选人列表 (用于球形动画)
+const candidates = computed(() => store.users.filter(u => u.status === 'normal'))
 
 const startRolling = () => {
   if (!store.users.length) {
@@ -66,8 +71,8 @@ const startRolling = () => {
     return
   }
   // 过滤未中奖用户
-  const candidates = store.users.filter(u => u.status === 'normal')
-  if (candidates.length === 0) {
+  const validCandidates = store.users.filter(u => u.status === 'normal')
+  if (validCandidates.length === 0) {
     alert('所有人都已中奖！')
     return
   }
@@ -77,9 +82,13 @@ const startRolling = () => {
     return
   }
   
+  // 重置状态
+  currentWinners.value = []
+  showSphere.value = true
   isRolling.value = true
   
-  // 动画循环
+  // 动画循环 (已由 TagCloud 接管，这里只需要标记状态)
+  /*
   timer = setInterval(() => {
     // 随机选取 drawCount 个用户展示
     const temp = []
@@ -90,18 +99,22 @@ const startRolling = () => {
     }
     displayUsers.value = temp
   }, 50) // 50ms 刷新一次
+  */
 }
 
 const stopRolling = () => {
   if (!isRolling.value) return
-  clearInterval(timer)
+  // clearInterval(timer)
   isRolling.value = false
   
   // 执行混合抽奖
   const winners = store.drawMixed(drawCount.value)
   if (winners.length > 0) {
     currentWinners.value = winners
-    displayUsers.value = winners
+    // displayUsers.value = winners
+    // 切换显示模式：隐藏球形，显示结果
+    showSphere.value = false
+    
     // showWinnerModal.value = true // 移除弹窗
     fireConfetti()
   } else {
@@ -137,7 +150,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('keyup', handleKeyup)
-  if (timer) clearInterval(timer)
+  // if (timer) clearInterval(timer)
 })
 
 // --- 特效 ---
@@ -209,28 +222,13 @@ const fireConfetti = () => {
       <main class="center-panel">
         <div class="prize-info" v-if="!isAllFinished">
           <div class="mixed-info">
-            <icon-trophy size="48" style="color: gold; margin-bottom: 10px;" />
+            <icon-trophy size="36" style="color: gold; margin-bottom: 5px;" />
             <h2 class="prize-name">
               年会大抽奖
             </h2>
             <div class="pool-stat">
               奖池剩余: <span class="num">{{ remainPrizes }}</span> / <span class="total">{{ totalPrizes }}</span>
             </div>
-          </div>
-          
-          <div class="action-bar">
-            <span class="label">每次抽取:</span>
-            <a-input-number v-model="drawCount" :min="1" :max="50" style="width: 80px; background: rgba(255,255,255,0.9);" :disabled="isRolling" />
-            <a-button 
-              type="primary" 
-              size="large" 
-              shape="round" 
-              :status="isRolling ? 'danger' : 'normal'"
-              class="start-btn"
-              @click="toggleLottery"
-            >
-              {{ isRolling ? '停止 (Space)' : '开始 (Space)' }}
-            </a-button>
           </div>
         </div>
         
@@ -244,20 +242,50 @@ const fireConfetti = () => {
         </div>
 
         <div class="rolling-board" v-if="!isAllFinished">
-          <div class="user-card" v-for="(user, index) in displayUsers" :key="index">
-            <div class="avatar">{{ user.name[0] }}</div>
-            <div class="info">
-              <div class="name">{{ user.name }}</div>
-              <div class="dept">{{ user.department }}</div>
-            </div>
-            <!-- 结果展示时显示奖项 -->
-            <div class="won-prize" v-if="user.prizeId && !isRolling">
-               {{ store.prizes.find(p => p.id === user.prizeId)?.name }}
+          <!-- 球形动画模式 -->
+          <div v-if="showSphere" class="sphere-wrapper">
+             <TagCloud 
+               v-if="candidates.length > 0" 
+               :users="candidates" 
+               :speed="isRolling ? 8 : 1" 
+               :radius="400"
+               :highlight="isRolling" 
+             />
+             <div v-else class="placeholder">暂无抽奖人员</div>
+          </div>
+
+          <!-- 结果展示模式 (原卡片效果) -->
+          <div v-else class="results-grid">
+            <div class="user-card" v-for="(user, index) in currentWinners" :key="index">
+              <div class="avatar">{{ user.name[0] }}</div>
+              <div class="info">
+                <div class="name">{{ user.name }}</div>
+                <div class="dept">{{ user.department }}</div>
+              </div>
+              <!-- 结果展示时显示奖项 -->
+              <div class="won-prize" v-if="user.prizeId">
+                 {{ store.prizes.find(p => p.id === user.prizeId)?.name }}
+              </div>
             </div>
           </div>
-          <div v-if="displayUsers.length === 0" class="placeholder">
-            准备开始
-          </div>
+        </div>
+
+        <!-- 底部操作栏 -->
+        <div class="action-bar-container" v-if="!isAllFinished">
+            <div class="action-bar">
+              <span class="label">每次抽取:</span>
+              <a-input-number v-model="drawCount" :min="1" :max="50" style="width: 100px; background: rgba(255,255,255,0.9);" :disabled="isRolling" size="large" />
+              <a-button 
+                type="primary" 
+                size="large" 
+                shape="round" 
+                :status="isRolling ? 'danger' : 'normal'"
+                class="start-btn"
+                @click="toggleLottery"
+              >
+                {{ isRolling ? '停止 (Space)' : '开始 (Space)' }}
+              </a-button>
+            </div>
         </div>
       </main>
 
@@ -439,56 +467,47 @@ const fireConfetti = () => {
   align-items: center;
   background: rgba(255,255,255,0.05);
   border-radius: 12px;
-  padding: 20px;
+  padding: 0; /* 移除内边距，让动画充满 */
+  position: relative;
+  overflow: hidden;
   
   .prize-info {
+    position: absolute;
+    top: 20px;
+    left: 0;
+    right: 0;
     text-align: center;
-    margin-bottom: 30px;
-    width: 100%;
+    z-index: 10;
+    pointer-events: none; /* 让鼠标穿透，不影响动画旋转 */
     
-    .prize-img {
-      height: 120px;
-      margin-bottom: 10px;
-      img {
-        height: 100%;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-      }
+    .mixed-info {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      background: rgba(0,0,0,0.3); /* 增加背景增强可读性 */
+      padding: 10px 30px;
+      border-radius: 20px;
+      backdrop-filter: blur(5px);
     }
-    
+
     .prize-name {
-      font-size: 48px; // 更大的字体
+      font-size: 32px; /* 稍微调小一点以免遮挡太多 */
       font-weight: bold;
-      margin: 0 0 20px 0;
-      text-shadow: 0 4px 8px rgba(0,0,0,0.5);
+      margin: 0 0 5px 0;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.8);
       letter-spacing: 2px;
     }
     
-    .action-bar {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 15px;
-      background: rgba(0,0,0,0.2);
-      padding: 10px 20px;
-      border-radius: 40px;
-      width: fit-content;
-      margin: 0 auto;
-      
-      .label {
-        font-size: 16px;
-      }
-      
-      .start-btn {
-        width: 160px;
-        font-size: 20px;
-        font-weight: bold;
-      }
+    .pool-stat {
+      font-size: 16px;
+      opacity: 0.9;
     }
+
     .all-finished {
       text-align: center;
       color: #fff;
       padding: 40px;
+      pointer-events: auto; /* 允许交互 */
       
       h2 {
         font-size: 36px;
@@ -501,16 +520,80 @@ const fireConfetti = () => {
     }
   }
 
+  .action-bar-container {
+    position: absolute;
+    bottom: 30px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    z-index: 20;
+    
+    .action-bar {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 15px;
+      background: rgba(0,0,0,0.4);
+      padding: 15px 30px;
+      border-radius: 50px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.1);
+      transition: all 0.3s;
+      
+      &:hover {
+        background: rgba(0,0,0,0.6);
+        transform: translateY(-2px);
+      }
+      
+      .label {
+        font-size: 18px;
+        font-weight: bold;
+      }
+      
+      .start-btn {
+        width: 200px;
+        font-size: 22px;
+        font-weight: bold;
+        height: 50px;
+      }
+    }
+  }
+
   .rolling-board {
     flex: 1;
     width: 100%;
     display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    align-content: flex-start;
-    gap: 20px;
-    overflow-y: auto;
+    flex-direction: column;
+    overflow: hidden; 
+    position: relative;
     
+    .sphere-wrapper {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      /* 增加一点透视感 */
+      perspective: 1500px;
+    }
+
+    .results-grid {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-content: center; /* 结果居中显示 */
+      gap: 20px;
+      overflow-y: auto;
+      padding: 80px 20px 100px; /* 留出顶部和底部的空间 */
+      animation: fadeIn 0.5s ease-out;
+      z-index: 5; /* 确保在背景之上 */
+    }
+
     .placeholder {
       font-size: 24px;
       opacity: 0.5;
@@ -518,6 +601,11 @@ const fireConfetti = () => {
       margin-top: 100px;
     }
   }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 /* 卡片样式优化 */
