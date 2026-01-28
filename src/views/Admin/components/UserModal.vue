@@ -1,7 +1,5 @@
 <script setup>
 import { reactive, ref } from 'vue'
-import { useMainStore } from '@/store/mainStore'
-import { Message } from '@arco-design/web-vue'
 
 const props = defineProps({
   user: {

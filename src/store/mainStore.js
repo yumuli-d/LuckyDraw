@@ -3,7 +3,7 @@ import { defineStore } from 'pinia'
 export const useMainStore = defineStore('main', {
   state: () => ({
     settings: {
-      title: '2026年会抽奖活动',
+      title: '年会抽奖活动',
       bgImage: '',
       drawMode: 'selective' // selective: 先选奖项, mixed: 混合抽奖
     },
@@ -30,7 +30,10 @@ export const useMainStore = defineStore('main', {
     currentPrizeId: '4' // 默认选中最后一个奖项（通常是小奖先抽）
   }),
   actions: {
-    // --- 用户管理 ---
+    /**
+     * 新增用户
+     * @param {Object} user 用户信息
+     */
     addUser(user) {
       this.users.push({
         id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
@@ -39,25 +42,30 @@ export const useMainStore = defineStore('main', {
         ...user
       })
     },
+    /**
+     * 更新用户信息
+     * @param {string} id 用户ID
+     * @param {Object} data 更新的数据
+     */
     updateUser(id, data) {
       const index = this.users.findIndex(u => u.id === id)
       if (index !== -1) {
         this.users[index] = { ...this.users[index], ...data }
       }
     },
+    /**
+     * 删除用户
+     * @param {string} id 用户ID
+     */
     deleteUser(id) {
       this.users = this.users.filter(u => u.id !== id)
     },
-    resetUserStatus() {
-      this.users.forEach(u => {
-        u.status = 'normal'
-        u.prizeId = null
-      })
-      this.prizes.forEach(p => p.drawn = 0)
-      this.winners = []
-    },
     
     // --- 奖项管理 ---
+    /**
+     * 新增奖项
+     * @param {Object} prize 奖项信息
+     */
     addPrize(prize) {
       this.prizes.push({
         id: Date.now().toString(),
@@ -65,12 +73,21 @@ export const useMainStore = defineStore('main', {
         ...prize
       })
     },
+    /**
+     * 更新奖项信息
+     * @param {string} id 奖项ID
+     * @param {Object} data 更新的数据
+     */
     updatePrize(id, data) {
       const index = this.prizes.findIndex(p => p.id === id)
       if (index !== -1) {
         this.prizes[index] = { ...this.prizes[index], ...data }
       }
     },
+    /**
+     * 删除奖项
+     * @param {string} id 奖项ID
+     */
     deletePrize(id) {
       this.prizes = this.prizes.filter(p => p.id !== id)
     },
@@ -212,15 +229,21 @@ export const useMainStore = defineStore('main', {
       return winners
     },
 
+    /**
+     * 重置所有数据
+     */
     resetAll() {
       this.users = []
       this.winners = []
       this.prizes.forEach(p => p.drawn = 0)
       this.settings.bgImage = ''
-      this.settings.title = '2026年会抽奖活动'
+      this.settings.title = '年会抽奖活动'
       this.settings.drawMode = 'selective'
     },
 
+    /**
+     * 生成测试数据
+     */
     generateTestData() {
       // 1. 重置所有数据
       this.users = []
@@ -252,7 +275,9 @@ export const useMainStore = defineStore('main', {
       ]
       
       // 默认选中最后一个奖项
-      this.currentPrizeId = '5'
+      if (this.prizes.length > 0) {
+        this.currentPrizeId = this.prizes[this.prizes.length - 1].id
+      }
     }
   },
   persist: true

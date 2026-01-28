@@ -104,11 +104,6 @@
         };
         reader.readAsBinaryString(fileItem.file);
     };
-
-    const resetStatus = () => {
-        store.resetUserStatus();
-        Message.success("已重置所有人员抽奖状态");
-    };
 </script>
 
 <template>
@@ -124,11 +119,6 @@
                     </template>
                 </a-upload>
                 <a-button type="primary" @click="openAdd">新增人员</a-button>
-                <a-popconfirm
-                    content="确定要重置所有人的中奖状态吗？这将允许他们再次参与抽奖。"
-                    @ok="resetStatus">
-                    <a-button status="warning">重置抽奖状态</a-button>
-                </a-popconfirm>
             </a-space>
             <a-input-search
                 v-model="searchQuery"

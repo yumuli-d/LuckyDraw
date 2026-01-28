@@ -3,7 +3,7 @@
     import { useMainStore } from "@/store/mainStore";
     import confetti from "canvas-confetti";
     import { IconSettings, IconTrophy } from "@arco-design/web-vue/es/icon";
-    import { Modal } from "@arco-design/web-vue";
+    import { Modal, Message } from "@arco-design/web-vue";
     import TagCloud from "./components/TagCloud.vue";
 
     const WinnersModal = defineAsyncComponent(() => import("./components/WinnersModal.vue"));
@@ -30,20 +30,39 @@
         return currentPrize.value.drawn >= currentPrize.value.count;
     });
 
+    // --- 监听模式切换 ---
+    watch(
+        () => store.settings.drawMode,
+        (newMode) => {
+            if (newMode === "selective" && currentPrize.value) {
+                drawCount.value = currentPrize.value.perDraw || 1;
+            }
+        }
+    );
+
+    /**
+     * 选择奖项逻辑
+     * @param {string} id 奖项ID
+     */
     const selectPrize = (id) => {
         if (isRolling.value) return;
         store.currentPrizeId = id;
+
+        // 联动：切换奖项时，自动设置该奖项预设的单次抽取数
+        const prize = store.prizes.find((p) => p.id === id);
+        if (prize && prize.perDraw) {
+            drawCount.value = prize.perDraw;
+        }
+
         showSphere.value = true;
         currentWinners.value = [];
     };
 
-    // 自动跳转逻辑移除，改为混合模式不需要定位特定奖项
-
-    // --- 中奖名单数据 ---
+    /**
+     * 侧边栏中奖名单计算属性
+     */
     const winnersList = computed(() => {
-        // 展平所有中奖记录
         const list = [];
-        // 按时间倒序遍历中奖批次
         const sortedWinners = [...store.winners].sort((a, b) => b.time - a.time);
 
         sortedWinners.forEach((record) => {
@@ -66,43 +85,47 @@
         return list;
     });
 
+    /**
+     * 打开全屏中奖名单弹窗
+     */
     const openWinnersModal = () => {
         Modal.open({
             title: "所有中奖名单",
-            width: "800px",
+            fullscreen: true,
             footer: false,
+            bodyStyle: { backgroundColor: "#f7f8fa", paddingTop: "12px" },
             content: () => h(WinnersModal)
         });
     };
 
     // --- 滚动动画 ---
-    // const displayUsers = ref([]) // 当前展示在屏幕上的用户
-    // let timer = null
-
     // 候选人列表 (用于球形动画)
     const candidates = computed(() => store.users.filter((u) => u.status === "normal"));
 
+    /**
+     * 开始抽奖滚动动画
+     */
     const startRolling = () => {
         if (!store.users.length) {
-            alert("暂无人员数据，请先到管理后台导入！");
+            Message.warning("暂无人员数据，请先到管理后台导入！");
             return;
         }
         // 过滤未中奖用户
         const validCandidates = store.users.filter((u) => u.status === "normal");
         if (validCandidates.length === 0) {
-            alert("所有人都已中奖！");
+            Message.info("所有人都已中奖！");
             return;
         }
 
         // 根据模式检查
         if (store.settings.drawMode === "selective") {
             if (isCurrentPrizeFinished.value) {
-                alert("该奖项已抽完，请选择其他奖项！");
+                Message.warning("该奖项已抽完，请选择其他奖项！");
                 return;
             }
         } else {
             if (isAllFinished.value) {
-                alert("所有奖项已抽完！");
+                Message.warning("所有奖项已抽完！");
                 return;
             }
         }
@@ -113,6 +136,9 @@
         isRolling.value = true;
     };
 
+    /**
+     * 停止滚动并生成中奖结果
+     */
     const stopRolling = () => {
         if (!isRolling.value) return;
         isRolling.value = false;
@@ -131,14 +157,13 @@
             showSphere.value = false;
             fireConfetti();
         } else {
-            alert("抽奖失败，可能人数或奖品不足");
+            Message.error("抽奖失败，可能人数或奖池奖品不足");
         }
     };
 
-    // 监听弹窗关闭 (已移除)
-    // watch(showWinnerModal, (val) => {
-    // })
-
+    /**
+     * 切换抽奖状态
+     */
     const toggleLottery = () => {
         if (isRolling.value) {
             stopRolling();
@@ -147,7 +172,9 @@
         }
     };
 
-    // --- 键盘事件 ---
+    /**
+     * 处理键盘按键事件
+     */
     const handleKeyup = (e) => {
         if (e.code === "Space") {
             // 防止空格键触发按钮点击
@@ -158,11 +185,15 @@
 
     onMounted(() => {
         window.addEventListener("keyup", handleKeyup);
+
+        // 初始化：根据当前选中的奖项设置初始抽取人数
+        if (currentPrize.value && currentPrize.value.perDraw) {
+            drawCount.value = currentPrize.value.perDraw;
+        }
     });
 
     onUnmounted(() => {
         window.removeEventListener("keyup", handleKeyup);
-        // if (timer) clearInterval(timer)
     });
 
     // --- 特效 ---
@@ -317,7 +348,7 @@
                             :min="1"
                             :max="50"
                             style="width: 100px; background: rgba(255, 255, 255, 0.9)"
-                            :disabled="isRolling"
+                            :disabled="isRolling || store.settings.drawMode === 'selective'"
                             size="large" />
                         <a-button
                             type="primary"
@@ -769,13 +800,5 @@
             opacity: 1;
             transform: translateX(0);
         }
-    }
-
-    /* Modal styles (unused) */
-    .winner-grid {
-        display: none;
-    }
-    .winner-item {
-        display: none;
     }
 </style>

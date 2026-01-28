@@ -40,50 +40,28 @@ export default defineConfig({
     build: {
         rollupOptions: {
             output: {
-                manualChunks: (filePath) => {
-                    const basePath = __dirname.replace(/\\/g, "/") + "/node_modules/";
-                    if (!filePath.includes(basePath)) return;
-
-                    const path = filePath.replace(basePath, "");
-                    const moduleName = path.split("/")[0].toString();
-
-                    // 基础依赖包
-                    const baseModules = ["@vue", "echarts"];
-                    // 检查基础依赖包
-                    if (baseModules.includes(moduleName)) {
-                        return moduleName;
-                    }
-
-                    // arco 相关依赖包规则
-                    const arcoRules = {
-                        core: {
-                            patterns: [
-                                "@arco-design/web-vue/es/index.js",
-                                "@arco-design/web-vue/es/_virtual"
-                            ],
-                            chunk: "@arco-design-core"
-                        },
-                        icon: {
-                            patterns: ["@arco-design/web-vue/es/icon/"],
-                            chunk: "@arco-design-icon"
-                        },
-                        components: {
-                            patterns: ["@arco-design/web-vue/es/"],
-                            chunk: "@arco-design-components"
+                manualChunks(id) {
+                    if (id.includes("node_modules")) {
+                        // 1. Arco Design 相关依赖统一打包，避免循环引用
+                        if (id.includes("@arco-design")) {
+                            return "arco-vendor";
                         }
-                    };
 
-                    // 检查是否匹配 arco 规则（按照特定顺序检查）
-                    const ruleOrder = ["core", "icon", "components"];
-                    for (const key of ruleOrder) {
-                        const rule = arcoRules[key];
-                        if (rule.patterns.some((pattern) => path.includes(pattern))) {
-                            return rule.chunk;
+                        // 2. 优化其他第三方库分包
+                        // Vue 全家桶
+                        if (id.includes("vue") || id.includes("pinia") || id.includes("vue-router")) {
+                            return "vue-vendor";
                         }
+                        // 大型独立库单独打包
+                        if (id.includes("xlsx")) {
+                            return "xlsx-vendor";
+                        }
+                        if (id.includes("canvas-confetti")) {
+                            return "confetti-vendor";
+                        }
+                        // 其他依赖
+                        return "vendor";
                     }
-
-                    // 其他依赖打包到 vendor
-                    return "vendor";
                 }
             }
         }
