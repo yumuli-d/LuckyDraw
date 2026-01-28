@@ -4,7 +4,8 @@ export const useMainStore = defineStore('main', {
   state: () => ({
     settings: {
       title: '2026年会抽奖活动',
-      bgImage: ''
+      bgImage: '',
+      drawMode: 'selective' // selective: 先选奖项, mixed: 混合抽奖
     },
     /**
      * 用户列表
@@ -77,6 +78,58 @@ export const useMainStore = defineStore('main', {
     // --- 抽奖逻辑 ---
     
     /**
+     * 指定奖项抽奖逻辑
+     * @param {string} prizeId 奖项ID
+     * @param {number} count 抽取人数
+     */
+    drawPrize(prizeId, count) {
+      const prize = this.prizes.find(p => p.id === prizeId)
+      if (!prize) return []
+
+      const remain = prize.count - prize.drawn
+      if (remain <= 0) return []
+
+      // 1. 准备候选人
+      const candidates = this.users.filter(u => u.status === 'normal')
+      if (candidates.length === 0) return []
+
+      // 2. 确定实际抽取数量
+      const actualCount = Math.min(count, remain, candidates.length)
+      if (actualCount === 0) return []
+
+      // 3. 随机抽取用户
+      const winners = []
+      const indices = new Set()
+      while (winners.length < actualCount) {
+        const idx = Math.floor(Math.random() * candidates.length)
+        if (!indices.has(idx)) {
+          indices.add(idx)
+          const user = candidates[idx]
+          
+          user.status = 'won'
+          user.prizeId = prizeId
+          winners.push(user)
+        }
+      }
+
+      // 4. 更新奖项统计和记录
+      const time = Date.now()
+      const batchId = time.toString()
+      
+      prize.drawn += actualCount
+
+      this.winners.push({
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+        batchId,
+        prizeId,
+        userIds: winners.map(w => w.id),
+        time
+      })
+
+      return winners
+    },
+
+    /**
      * 混合抽奖逻辑
      * @param {number} count 抽取人数
      */
@@ -102,11 +155,12 @@ export const useMainStore = defineStore('main', {
 
       // 4. 随机抽取奖品
       // 使用 Fisher-Yates 洗牌算法打乱奖品池
-      for (let i = prizePool.length - 1; i > 0; i--) {
+      const poolCopy = [...prizePool]
+      for (let i = poolCopy.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
-        [prizePool[i], prizePool[j]] = [prizePool[j], prizePool[i]];
+        [poolCopy[i], poolCopy[j]] = [poolCopy[j], poolCopy[i]];
       }
-      const selectedPrizeIds = prizePool.slice(0, actualCount)
+      const selectedPrizeIds = poolCopy.slice(0, actualCount)
 
       // 5. 随机抽取用户
       const winners = []
@@ -164,6 +218,7 @@ export const useMainStore = defineStore('main', {
       this.prizes.forEach(p => p.drawn = 0)
       this.settings.bgImage = ''
       this.settings.title = '2026年会抽奖活动'
+      this.settings.drawMode = 'selective'
     },
 
     generateTestData() {
